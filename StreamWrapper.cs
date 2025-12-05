@@ -95,6 +95,7 @@ namespace CDCloser
             stream.Position = 0;
             stream.CopyTo(clone_stream);
             stream.Position = original_position;
+            clone_stream.Position = 0;
             ppstm = new ManagedStream(clone_stream);
 
         }

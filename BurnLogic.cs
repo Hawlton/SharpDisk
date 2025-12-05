@@ -77,6 +77,7 @@ namespace CDCloser
 
             return run_sta_task(async () =>
             {
+                var streams_to_dispose = new List<ManagedStream>();
                 ctoken.ThrowIfCancellationRequested();
                 IFileSystemImage fsi = new MsftFileSystemImage
                 {
@@ -89,8 +90,10 @@ namespace CDCloser
                 {
                     ctoken.ThrowIfCancellationRequested();
                     var fs = new FileStream(item.path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    ComTypes.IStream istream = new CDCloser.ManagedStream(fs);
+                    var istream = new CDCloser.ManagedStream(fs);
                     root.AddFile(item.filename, (FsiStream)(object)istream);
+                    streams_to_dispose.Add(istream);
+                    fs.Dispose();
                 }
 
                 IFileSystemImageResult result = fsi.CreateResultImage();
@@ -112,6 +115,15 @@ namespace CDCloser
                 {
                     event_cookie?.Unadvise();
                     event_cookie = null;
+
+                    if(result != null && Marshal.IsComObject(result)) Marshal.ReleaseComObject(result);
+                    if(result != null && Marshal.IsComObject(fsi)) Marshal.ReleaseComObject(fsi);
+                    foreach(var stream in streams_to_dispose)
+                    {
+                        stream.Dispose();
+                    }
+
+
                 }
                 await Task.CompletedTask;
 
