@@ -7,6 +7,8 @@ namespace CDCloser
     {
         private BindingList<SelectedFile> burn_list = new();
         private BindingList<DriveInfo> drive_list = new();
+        private BurnLogic burner = new BurnLogic();
+        private CancellationTokenSource? burn_cts;
         private long disc_capacity = 0;
         public MainForm()
         {
@@ -48,6 +50,99 @@ namespace CDCloser
                 status_label.Text = "No optical drives found.";
                 status_label.ForeColor = Color.Red;
             }
+        }
+
+        private async void start_burn(object sender, EventArgs e)
+        {
+            if(burn_list.Count == 0 || drive_box.SelectedItem is not DriveInfo selected_drive)
+            {
+                MessageBox.Show("Drive not selected or burn list is empty");
+                return;
+            }
+            if(disc_capacity <= burn_list.Sum(f => f.byte_size))
+            {
+                MessageBox.Show("Size of burn list exceeds disc capacity");
+                return;
+            }
+            set_ui_enabled(false);
+            burn_cts = new CancellationTokenSource();
+            cancel_button.Enabled = true;
+
+            try
+            {
+                var recorders = burner.list_recorders();
+                var recorder_id = recorders[drive_box.SelectedIndex];
+                
+                if(recorder_id == null)
+                {
+                    if (recorders.Length == 1) recorder_id = recorders[0];
+                    else throw new InvalidOperationException($"Could not find recorder for drive {selected_drive.Name}");
+                }
+
+                burner.select_recorder(recorder_id);
+
+                main_prog.Style = ProgressBarStyle.Continuous;
+                main_prog.Value = 0;
+                status_label.Text = "Burning...";
+                status_label.ForeColor = Color.Orange;
+
+                var progress = new Progress<BurnProgress>(p =>
+                {
+                    main_prog.Value = Math.Min(p.percent, 100);
+                    status_label.Text = p.completed ? "Burn Complete" : $"Burning...{p.percent}%";
+                });
+
+                await burner.burn_files(burn_list.ToList(), disc_label_box.Text, progress, burn_cts.Token);
+
+                status_label.Text = "Burn Complete";
+                status_label.ForeColor = Color.Green;
+                MessageBox.Show("Burn Complete", "Success");
+            }
+            catch(OperationCanceledException)
+            {
+                status_label.Text = "Burn Cancelled";
+                status_label.ForeColor = Color.Orange;
+            }
+            catch(Exception ex)
+            {
+                status_label.Text = "Burn Failed";
+                status_label.ForeColor = Color.Red;
+                MessageBox.Show($"Error: {ex.Message}", "Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                Debug.WriteLine($"Error: {ex.Message}");
+            }
+            finally
+            {
+                cancel_button.Enabled = false;
+                main_prog.Value = 0;
+                burn_cts?.Dispose();
+                burn_cts = null;
+                set_ui_enabled(true);
+            }
+
+        }
+
+        private void cancel_burn_clicked(object sender, EventArgs e)
+        {
+            burn_cts?.Cancel();
+        }
+
+        protected override void OnFormClosing(FormClosingEventArgs e)
+        {
+            burn_cts?.Cancel();
+            burner.Dispose();
+            base.OnFormClosing(e);
+        }
+
+        private void set_ui_enabled(bool enabled)
+        {
+            browse_button.Enabled = enabled;
+            remove_button.Enabled = enabled;
+            drive_refresh.Enabled = enabled;
+            drive_box.Enabled = enabled;
+            burn_button.Enabled = enabled;
+            disc_label_box.Enabled = enabled;
+            burn_speed_box.Enabled = enabled;
+            file_grid.Enabled = enabled;
         }
 
         private async void check_drive(int index)
@@ -228,12 +323,5 @@ namespace CDCloser
 
 
 
-        //private sealed class SelectedFile
-        //{
-        //    public string filename { get; init; } = string.Empty;
-        //    public long byte_size { get; init; }
-        //    public string path { get; init; } = string.Empty;
-        //    public string readable_size => Globals.to_human_readable(byte_size);
-        //}
     }
 }

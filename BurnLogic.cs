@@ -25,7 +25,7 @@ namespace CDCloser
         public bool completed { get; init; }
     }
 
-    internal class BurnLogic : IDisposable
+    public class BurnLogic : IDisposable
     {
         private IDiscMaster2 disc_master;
         private IDiscFormat2Data disc_format;
@@ -93,7 +93,6 @@ namespace CDCloser
                     var istream = new CDCloser.ManagedStream(fs);
                     root.AddFile(item.filename, (FsiStream)(object)istream);
                     streams_to_dispose.Add(istream);
-                    fs.Dispose();
                 }
 
                 IFileSystemImageResult result = fsi.CreateResultImage();

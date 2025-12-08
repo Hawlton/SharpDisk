@@ -32,14 +32,14 @@
             drive_box = new ComboBox();
             label2 = new Label();
             burn_speed_box = new ComboBox();
-            progressBar1 = new ProgressBar();
+            main_prog = new ProgressBar();
             burn_button = new Button();
             drive_refresh = new Button();
-            button3 = new Button();
+            browse_button = new Button();
             disc_label_box = new TextBox();
             label1 = new Label();
             file_grid = new DataGridView();
-            Remove = new Button();
+            remove_button = new Button();
             stat_bar = new StatusStrip();
             status = new ToolStripStatusLabel();
             status_label = new ToolStripStatusLabel();
@@ -49,6 +49,7 @@
             disk_cap_label = new ToolStripStatusLabel();
             aux_progress = new ToolStripProgressBar();
             close_media_checkbox = new CheckBox();
+            cancel_button = new Button();
             ((System.ComponentModel.ISupportInitialize)file_grid).BeginInit();
             stat_bar.SuspendLayout();
             SuspendLayout();
@@ -91,12 +92,12 @@
             burn_speed_box.Size = new Size(82, 23);
             burn_speed_box.TabIndex = 5;
             // 
-            // progressBar1
+            // main_prog
             // 
-            progressBar1.Location = new Point(11, 101);
-            progressBar1.Name = "progressBar1";
-            progressBar1.Size = new Size(509, 23);
-            progressBar1.TabIndex = 6;
+            main_prog.Location = new Point(11, 101);
+            main_prog.Name = "main_prog";
+            main_prog.Size = new Size(509, 23);
+            main_prog.TabIndex = 6;
             // 
             // burn_button
             // 
@@ -106,6 +107,7 @@
             burn_button.TabIndex = 8;
             burn_button.Text = "Start";
             burn_button.UseVisualStyleBackColor = true;
+            burn_button.Click += start_burn;
             // 
             // drive_refresh
             // 
@@ -117,15 +119,15 @@
             drive_refresh.UseVisualStyleBackColor = true;
             drive_refresh.Click += refresh_clicked;
             // 
-            // button3
+            // browse_button
             // 
-            button3.Location = new Point(523, 10);
-            button3.Name = "button3";
-            button3.Size = new Size(127, 23);
-            button3.TabIndex = 10;
-            button3.Text = "Browse File(s)";
-            button3.UseVisualStyleBackColor = true;
-            button3.Click += browse_clicked;
+            browse_button.Location = new Point(523, 10);
+            browse_button.Name = "browse_button";
+            browse_button.Size = new Size(127, 23);
+            browse_button.TabIndex = 10;
+            browse_button.Text = "Browse File(s)";
+            browse_button.UseVisualStyleBackColor = true;
+            browse_button.Click += browse_clicked;
             // 
             // disc_label_box
             // 
@@ -152,15 +154,15 @@
             file_grid.Size = new Size(639, 274);
             file_grid.TabIndex = 14;
             // 
-            // Remove
+            // remove_button
             // 
-            Remove.Location = new Point(523, 36);
-            Remove.Name = "Remove";
-            Remove.Size = new Size(127, 23);
-            Remove.TabIndex = 15;
-            Remove.Text = "Remove Selected";
-            Remove.UseVisualStyleBackColor = true;
-            Remove.Click += remove_clicked;
+            remove_button.Location = new Point(523, 36);
+            remove_button.Name = "remove_button";
+            remove_button.Size = new Size(127, 23);
+            remove_button.TabIndex = 15;
+            remove_button.Text = "Remove Selected";
+            remove_button.UseVisualStyleBackColor = true;
+            remove_button.Click += remove_clicked;
             // 
             // stat_bar
             // 
@@ -226,21 +228,33 @@
             close_media_checkbox.Text = "Close Media";
             close_media_checkbox.UseVisualStyleBackColor = true;
             // 
+            // cancel_button
+            // 
+            cancel_button.Enabled = false;
+            cancel_button.Location = new Point(523, 75);
+            cancel_button.Name = "cancel_button";
+            cancel_button.Size = new Size(127, 23);
+            cancel_button.TabIndex = 18;
+            cancel_button.Text = "Cancel";
+            cancel_button.UseVisualStyleBackColor = true;
+            cancel_button.Click += cancel_burn_clicked;
+            // 
             // MainForm
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
             ClientSize = new Size(662, 436);
+            Controls.Add(cancel_button);
             Controls.Add(close_media_checkbox);
             Controls.Add(stat_bar);
-            Controls.Add(Remove);
+            Controls.Add(remove_button);
             Controls.Add(file_grid);
             Controls.Add(label1);
             Controls.Add(disc_label_box);
-            Controls.Add(button3);
+            Controls.Add(browse_button);
             Controls.Add(drive_refresh);
             Controls.Add(burn_button);
-            Controls.Add(progressBar1);
+            Controls.Add(main_prog);
             Controls.Add(burn_speed_box);
             Controls.Add(label2);
             Controls.Add(drive_box);
@@ -260,15 +274,15 @@
         private ComboBox drive_box;
         private Label label2;
         private ComboBox burn_speed_box;
-        private ProgressBar progressBar1;
+        private ProgressBar main_prog;
         private Label label3;
         private Button burn_button;
         private Button drive_refresh;
-        private Button button3;
+        private Button browse_button;
         private TextBox disc_label_box;
         private Label label1;
         private DataGridView file_grid;
-        private Button Remove;
+        private Button remove_button;
         private StatusStrip stat_bar;
         private ToolStripStatusLabel status;
         private ToolStripStatusLabel status_label;
@@ -278,5 +292,6 @@
         private ToolStripStatusLabel disk_cap_label;
         private ToolStripProgressBar aux_progress;
         private CheckBox close_media_checkbox;
+        private Button cancel_button;
     }
 }
