@@ -69,7 +69,8 @@ namespace CDCloser
             disc_format.ClientName = "OptimalDisk";
         }
 
-        public Task burn_files(List<SelectedFile> files, string volume_label, IProgress<BurnProgress> progress = null, CancellationToken ctoken = default)
+
+        public Task burn_files(List<SelectedFile> files, string volume_label, bool close_media, IProgress<BurnProgress> progress = null, CancellationToken ctoken = default)
         {
             ensure_not_disposed();
             if (disc_recorder == null) throw new InvalidOperationException("disc_recorder returned null");
@@ -97,6 +98,7 @@ namespace CDCloser
 
                 IFileSystemImageResult result = fsi.CreateResultImage();
                 IMAPI2.IStream image_stream = (IMAPI2.IStream)(object)result.ImageStream;
+                disc_format.ForceMediaToBeClosed = close_media;
 
                 var sink = new DataFormatEventsSink(p => progress?.Report(p));
                 event_cookie = ConnectionPointCookie.Advise(disc_format, sink, typeof(DDiscFormat2DataEvents));

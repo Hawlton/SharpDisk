@@ -92,7 +92,7 @@ namespace CDCloser
                     status_label.Text = p.completed ? "Burn Complete" : $"Burning...{p.percent}%";
                 });
 
-                await burner.burn_files(burn_list.ToList(), disc_label_box.Text, progress, burn_cts.Token);
+                await burner.burn_files(burn_list.ToList(), disc_label_box.Text, close_media_checkbox.Checked, progress, burn_cts.Token);
 
                 status_label.Text = "Burn Complete";
                 status_label.ForeColor = Color.Green;
@@ -159,9 +159,17 @@ namespace CDCloser
             if (index < 0 || index >= drive_list.Count) index = 0;
             DriveInfo drive = drive_list[index];
             bool media_present = await Task.Run(() => Globals.is_media_present(drive.Name));
+            if(!media_present)
+            {
+                status_label.Text = "Media not present.";
+                status_label.ForeColor = Color.Red;
+                aux_progress.Visible = false;
+                return;
+                
+            }
             disc_capacity = await Task.Run(() => Globals.get_media_capacity(drive.Name));
             disk_cap_label.Text = Globals.to_human_readable(disc_capacity);
-            if (media_present && disc_capacity > burn_list.Sum(f => f.byte_size))
+            if (disc_capacity > burn_list.Sum(f => f.byte_size))
             {
                 status_label.Text = "Drive is ready.";
                 status_label.ForeColor = Color.Green;
@@ -288,9 +296,15 @@ namespace CDCloser
                 }
             }
             total_size.Text = Globals.to_human_readable(burn_list.Sum(f => f.byte_size));
-            if (drive_box.Items.Count > 0)
+            if (burn_list.Sum(f => f.byte_size) > disc_capacity)
             {
-                check_drive(drive_box.SelectedIndex);
+                status_label.Text = "Not enough space on disc for selected files.";
+                status_label.ForeColor = Color.Red;
+            }
+            else
+            {
+                status_label.Text = "Drive is ready.";
+                status_label.ForeColor = Color.Green;
             }
         }
         

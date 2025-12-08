@@ -221,6 +221,8 @@
             // close_media_checkbox
             // 
             close_media_checkbox.AutoSize = true;
+            close_media_checkbox.Checked = true;
+            close_media_checkbox.CheckState = CheckState.Checked;
             close_media_checkbox.Location = new Point(174, 75);
             close_media_checkbox.Name = "close_media_checkbox";
             close_media_checkbox.Size = new Size(91, 19);
