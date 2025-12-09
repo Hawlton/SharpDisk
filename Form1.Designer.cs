@@ -225,9 +225,9 @@
             close_media_checkbox.CheckState = CheckState.Checked;
             close_media_checkbox.Location = new Point(174, 75);
             close_media_checkbox.Name = "close_media_checkbox";
-            close_media_checkbox.Size = new Size(91, 19);
+            close_media_checkbox.Size = new Size(139, 19);
             close_media_checkbox.TabIndex = 17;
-            close_media_checkbox.Text = "Close Media";
+            close_media_checkbox.Text = "Close Media (finalize)";
             close_media_checkbox.UseVisualStyleBackColor = true;
             // 
             // cancel_button
@@ -262,7 +262,7 @@
             Controls.Add(drive_box);
             Controls.Add(drive_select_label);
             Name = "MainForm";
-            Text = "CD Closer";
+            Text = "SharpDisk";
             ((System.ComponentModel.ISupportInitialize)file_grid).EndInit();
             stat_bar.ResumeLayout(false);
             stat_bar.PerformLayout();

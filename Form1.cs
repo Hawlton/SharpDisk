@@ -10,6 +10,7 @@ namespace CDCloser
         private BurnLogic burner = new BurnLogic();
         private CancellationTokenSource? burn_cts;
         private long disc_capacity = 0;
+        private bool drive_ready = false;
         public MainForm()
         {
             InitializeComponent();
@@ -43,8 +44,7 @@ namespace CDCloser
 
             populate_disc_drives();
 
-            if (drive_box.Items.Count > 0) check_drive(0);
-            else
+            if(drive_list.Count == 0)
             {
                 MessageBox.Show("No optical media drives detected", "Drive Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
                 status_label.Text = "No optical drives found.";
@@ -54,33 +54,29 @@ namespace CDCloser
 
         private async void start_burn(object sender, EventArgs e)
         {
-            if(burn_list.Count == 0 || drive_box.SelectedItem is not DriveInfo selected_drive)
-            {
-                MessageBox.Show("Drive not selected or burn list is empty");
-                return;
-            }
-            if(disc_capacity <= burn_list.Sum(f => f.byte_size))
-            {
-                MessageBox.Show("Size of burn list exceeds disc capacity");
-                return;
-            }
+            if (!drive_ready) return;
+            //if(burn_list.Count == 0 || drive_box.SelectedItem is not DriveInfo selected_drive)
+            //{
+            //    MessageBox.Show("Drive not selected or burn list is empty");
+            //    return;
+            //}
+            //if(disc_capacity <= burn_list.Sum(f => f.byte_size))
+            //{
+            //    MessageBox.Show("Size of burn list exceeds disc capacity");
+            //    return;
+            //}
             set_ui_enabled(false);
             burn_cts = new CancellationTokenSource();
             cancel_button.Enabled = true;
 
             try
             {
-                var recorders = burner.list_recorders();
-                var recorder_id = recorders[drive_box.SelectedIndex];
-                
-                if(recorder_id == null)
-                {
-                    if (recorders.Length == 1) recorder_id = recorders[0];
-                    else throw new InvalidOperationException($"Could not find recorder for drive {selected_drive.Name}");
-                }
-
+                var recorders = burner.get_recorders();
+                var recorder_id = recorders.Where(d => drive_box.SelectedItem.ToString() == d.Key).Select(i => i.Value).FirstOrDefault();
+                if (String.IsNullOrEmpty(recorder_id)) throw new ArgumentNullException("Recorder ID should never be null here");
                 burner.select_recorder(recorder_id);
 
+                main_prog.Visible = true;
                 main_prog.Style = ProgressBarStyle.Continuous;
                 main_prog.Value = 0;
                 status_label.Text = "Burning...";
@@ -174,6 +170,7 @@ namespace CDCloser
                 status_label.Text = "Drive is ready.";
                 status_label.ForeColor = Color.Green;
                 aux_progress.Visible = false;
+                drive_ready = true;
             }
             else
             {
@@ -244,6 +241,7 @@ namespace CDCloser
 
         private void drive_changed(object sender, EventArgs e)
         {
+            drive_ready = false;
             check_drive(drive_box.SelectedIndex);
         }
 
@@ -273,6 +271,7 @@ namespace CDCloser
                     });
                 }
                 total_size.Text = Globals.to_human_readable(burn_list.Sum(f => f.byte_size));
+                if(disc_capacity == 0) check_drive(drive_box.SelectedIndex);
                 if (burn_list.Sum(f => f.byte_size) > disc_capacity)
                 {
                     status_label.Text = "Not enough space on disc for selected files.";

@@ -69,15 +69,9 @@ namespace CDCloser
                     recorder = new MsftDiscRecorder2();
                     recorder.InitializeDiscRecorder(unique_id);
                     string[] paths;
-                    try
-                    {
-                        paths = (string[])recorder.VolumePathNames;
-                    }
-                    catch
-                    {
-                        var object_array = recorder.VolumePathNames as object[];
-                        paths = object_array?.Select(o => o.ToString()).ToArray() ?? Array.Empty<string>();
-                    }
+                    
+                    var object_array = recorder.VolumePathNames as object[];
+                    paths = object_array?.Select(o => o.ToString()).ToArray() ?? Array.Empty<string>();
                     if (paths.Length == 0) continue;
                     if (paths[0][0] == letter)
                     {

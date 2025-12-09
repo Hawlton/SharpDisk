@@ -1,16 +1,9 @@
 ﻿using IMAPI2;
 using IMAPI2FS;
 using CDCloser;
-using System;
-using System.IO;
 using System.Runtime.InteropServices;
-using System.Runtime.InteropServices.ComTypes;
 using static System.Windows.Forms.AxHost;
-using System.Threading.Tasks;
-using System.Threading;
 using System.Diagnostics;
-using System.CodeDom;
-using System.Collections.Generic;
 
 using ComTypes = System.Runtime.InteropServices.ComTypes;
 
@@ -44,29 +37,75 @@ namespace CDCloser
         }
         Task run_sta_task(Func<Task> action, CancellationToken ct)
         {
-            return action();
+            var tcs = new TaskCompletionSource();
+            var thread = new Thread(() =>
+            {
+                try
+                {
+                    action().GetAwaiter().GetResult();
+                    tcs.SetResult();
+                }
+                catch (OperationCanceledException)
+                {
+                    tcs.SetCanceled(ct);
+                }
+                catch (Exception ex)
+                {
+                    tcs.SetException(ex);
+                }
+            });
+            thread.SetApartmentState(ApartmentState.STA);
+            thread.Start();
+            return tcs.Task;
         }
 
-        public string[] list_recorders()
+        public Dictionary<string, string> get_recorders()
         {
             ensure_not_disposed();
-            if (!disc_master.IsSupportedEnvironment) throw new InvalidOperationException("IMAPI2 is not supported on this system.");
-            var list = new string[disc_master.Count];
-            for(int i = 0; i < disc_master.Count; i++)
+            MsftDiscRecorder2 temp_recorder = null;
+            if (!disc_master.IsSupportedEnvironment) throw new InvalidOperationException("IMAPI2 is not supported on this environment");
+            var recorder_dict = new Dictionary<string, string>(StringComparer.OrdinalIgnoreCase);
+            foreach(string unique_id in disc_master)
             {
-                list[i] = disc_master[i];
+                temp_recorder = new MsftDiscRecorder2();
+                temp_recorder.InitializeDiscRecorder(unique_id);
+
+                string path;
+                var obj_array = temp_recorder.VolumePathNames as object[];
+                path = obj_array.FirstOrDefault()?.ToString();
+
+                if (!String.IsNullOrEmpty(path))
+                {
+                    recorder_dict[path] = unique_id;
+                }
+
+                Marshal.ReleaseComObject(temp_recorder);
+                temp_recorder = null;
             }
-            return list;
+            return recorder_dict;
+
         }
+        
 
         public void select_recorder(string unique_id)
         {
             ensure_not_disposed();
-            disc_recorder?.ReleaseExclusiveAccess();
+            if(disc_recorder != null)
+            {
+                try
+                {
+                    disc_recorder.ReleaseExclusiveAccess();
+                }
+                catch { }
+                if (Marshal.IsComObject(disc_recorder)) Marshal.ReleaseComObject(disc_recorder);
+            }
             disc_recorder = new MsftDiscRecorder2();
+            disc_format = new MsftDiscFormat2Data();
+
             disc_recorder.InitializeDiscRecorder(unique_id);
+            if (!disc_format.IsRecorderSupported(disc_recorder)) throw new InvalidOperationException("This recorder doesn't support data burning");
             disc_format.Recorder = disc_recorder;
-            disc_format.ClientName = "OptimalDisk";
+            disc_format.ClientName = "SharpDisk";
         }
 
 
@@ -78,22 +117,32 @@ namespace CDCloser
 
             return run_sta_task(async () =>
             {
-                var streams_to_dispose = new List<ManagedStream>();
                 ctoken.ThrowIfCancellationRequested();
+                disc_recorder.AcquireExclusiveAccess(false, "SharpDisk");
                 IFileSystemImage fsi = new MsftFileSystemImage
                 {
                     VolumeName = volume_label,
-                    FileSystemsToCreate = FsiFileSystems.FsiFileSystemISO9660 | FsiFileSystems.FsiFileSystemJoliet | FsiFileSystems.FsiFileSystemUDF
                 };
+
+                if (!disc_format.MediaPhysicallyBlank && !disc_format.MediaHeuristicallyBlank) throw new InvalidOperationException("Media must be physically blank");
+                if (!disc_format.IsCurrentMediaSupported(disc_recorder)) throw new InvalidOperationException("Current media is not supported");
+                if (!disc_format.IsRecorderSupported(disc_recorder)) throw new InvalidOperationException("This recorder is not supported for data burning");
+                IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE mediaType = disc_format.CurrentPhysicalMediaType;
+
+                if (mediaType == IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE.IMAPI_MEDIA_TYPE_CDROM ||
+                    mediaType == IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE.IMAPI_MEDIA_TYPE_CDR ||
+                    mediaType == IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE.IMAPI_MEDIA_TYPE_CDRW)
+                {
+                    fsi.FileSystemsToCreate = FsiFileSystems.FsiFileSystemISO9660 | FsiFileSystems.FsiFileSystemJoliet;
+                }
+                else fsi.FileSystemsToCreate = FsiFileSystems.FsiFileSystemUDF;
+                fsi.FreeMediaBlocks = disc_format.FreeSectorsOnMedia;
 
                 IFsiDirectoryItem root = fsi.Root;
                 foreach (var item in files)
                 {
                     ctoken.ThrowIfCancellationRequested();
-                    var fs = new FileStream(item.path, FileMode.Open, FileAccess.Read, FileShare.Read);
-                    var istream = new CDCloser.ManagedStream(fs);
-                    root.AddFile(item.filename, (FsiStream)(object)istream);
-                    streams_to_dispose.Add(istream);
+                    root.AddTree(item.path, false);
                 }
 
                 IFileSystemImageResult result = fsi.CreateResultImage();
@@ -119,10 +168,8 @@ namespace CDCloser
 
                     if(result != null && Marshal.IsComObject(result)) Marshal.ReleaseComObject(result);
                     if(result != null && Marshal.IsComObject(fsi)) Marshal.ReleaseComObject(fsi);
-                    foreach(var stream in streams_to_dispose)
-                    {
-                        stream.Dispose();
-                    }
+                    
+                    disc_recorder.ReleaseExclusiveAccess();
 
 
                 }
