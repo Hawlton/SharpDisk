@@ -55,16 +55,6 @@ namespace CDCloser
         private async void start_burn(object sender, EventArgs e)
         {
             if (!drive_ready) return;
-            //if(burn_list.Count == 0 || drive_box.SelectedItem is not DriveInfo selected_drive)
-            //{
-            //    MessageBox.Show("Drive not selected or burn list is empty");
-            //    return;
-            //}
-            //if(disc_capacity <= burn_list.Sum(f => f.byte_size))
-            //{
-            //    MessageBox.Show("Size of burn list exceeds disc capacity");
-            //    return;
-            //}
             set_ui_enabled(false);
             burn_cts = new CancellationTokenSource();
             cancel_button.Enabled = true;
@@ -81,7 +71,8 @@ namespace CDCloser
                 main_prog.Value = 0;
                 status_label.Text = "Burning...";
                 status_label.ForeColor = Color.Orange;
-
+                
+                //idk how this works honestly
                 var progress = new Progress<BurnProgress>(p =>
                 {
                     main_prog.Value = Math.Min(p.percent, 100);
@@ -181,63 +172,7 @@ namespace CDCloser
 
         }
 
-        //private void check_drive(int index)
-        //{
-        //    // Guard against invalid index and empty list.
-        //    if (drive_box.Items.Count == 0)
-        //    {
-        //        MessageBox.Show("No optical media drives detected", "Drive Selection Error", MessageBoxButtons.OK, MessageBoxIcon.Error);
-        //        status_label.Text = "No optical drives found.";
-        //        status_label.ForeColor = Color.Red;
-        //        return;
-        //    }
-
-        //    if (index < 0 || index >= drive_box.Items.Count)
-        //    {
-        //        index = 0; // fallback to first
-        //    }
-
-        //    // Set selection safely.
-        //    if (drive_box.SelectedIndex != index)
-        //    {
-        //        drive_box.SelectedIndex = index;
-        //    }
-
-        //    var selectedName = drive_box.SelectedItem as string;
-        //    if (string.IsNullOrEmpty(selectedName))
-        //    {
-        //        status_label.Text = "No drive selected.";
-        //        status_label.ForeColor = Color.Red;
-        //        return;
-        //    }
-
-        //    var selected_drive = DriveInfo.GetDrives()
-        //        .FirstOrDefault(d => string.Equals(d.Name, selectedName, StringComparison.OrdinalIgnoreCase));
-
-        //    if (selected_drive != null && selected_drive.IsReady)
-        //    {
-        //        Debug.WriteLine($"Selected drive: {selected_drive.Name}");
-        //        disk_cap_label.Text = to_human_readable(selected_drive.TotalSize);
-
-        //        long totalBytes = burn_list.Sum(f => f.byte_size);
-        //        if (selected_drive.TotalSize >= totalBytes)
-        //        {
-        //            Debug.WriteLine("Drive is ready for burning.");
-        //            status_label.Text = "Drive is ready.";
-        //            status_label.ForeColor = Color.Green;
-        //        }
-        //        else
-        //        {
-        //            status_label.Text = "Not enough space on disc for selected files.";
-        //            status_label.ForeColor = Color.Red;
-        //        }
-        //    }
-        //    else
-        //    {
-        //        status_label.Text = "Drive is not ready. Please insert a disc.";
-        //        status_label.ForeColor = Color.Red;
-        //    }
-        //}
+        
 
         private void drive_changed(object sender, EventArgs e)
         {

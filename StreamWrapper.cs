@@ -7,7 +7,7 @@ using System.Runtime.InteropServices.ComTypes;
 namespace CDCloser
 {
     //Wraps System.IO.Stream in COM IStream
-    //Wont let me use snake_case for function names :(
+    //this entire class is pretty much useless for this application
     public class ManagedStream: IStream, IDisposable
     {
         private Stream stream;

@@ -35,6 +35,8 @@ namespace CDCloser
             disc_master = new MsftDiscMaster2();
             disc_format = new MsftDiscFormat2Data();
         }
+
+        //idk how this works either. I even tried hard interrupting the task and that doesn't seem to have any effect.
         Task run_sta_task(Func<Task> action, CancellationToken ct)
         {
             var tcs = new TaskCompletionSource();
@@ -42,7 +44,13 @@ namespace CDCloser
             {
                 try
                 {
-                    action().GetAwaiter().GetResult();
+                    var task = action();
+                    while(!task.IsCompleted)
+                    {
+                        Application.DoEvents();
+                        Thread.Sleep(100);
+                    }
+                    task.GetAwaiter().GetResult();
                     tcs.SetResult();
                 }
                 catch (OperationCanceledException)
@@ -148,6 +156,7 @@ namespace CDCloser
                 IFileSystemImageResult result = fsi.CreateResultImage();
                 IMAPI2.IStream image_stream = (IMAPI2.IStream)(object)result.ImageStream;
                 disc_format.ForceMediaToBeClosed = close_media;
+                //Set write speed here later
 
                 var sink = new DataFormatEventsSink(p => progress?.Report(p));
                 event_cookie = ConnectionPointCookie.Advise(disc_format, sink, typeof(DDiscFormat2DataEvents));
@@ -211,7 +220,9 @@ namespace CDCloser
             disc_master = null;
         }
     }
+    
 
+    //Everything under here is also pretty much a mystery. I've never done any sort of threading with an interop library like this before.
     public class DataFormatEventsSink : DDiscFormat2DataEvents
     {
         private readonly Action<BurnProgress> report;
