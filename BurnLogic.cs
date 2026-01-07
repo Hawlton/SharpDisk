@@ -37,20 +37,14 @@ namespace CDCloser
         }
 
         //idk how this works either. I even tried hard interrupting the task and that doesn't seem to have any effect.
-        Task run_sta_task(Func<Task> action, CancellationToken ct)
+        Task run_sta_task(Action action, CancellationToken ct)
         {
             var tcs = new TaskCompletionSource();
             var thread = new Thread(() =>
             {
                 try
                 {
-                    var task = action();
-                    while(!task.IsCompleted)
-                    {
-                        Application.DoEvents();
-                        Thread.Sleep(100);
-                    }
-                    task.GetAwaiter().GetResult();
+                    action();
                     tcs.SetResult();
                 }
                 catch (OperationCanceledException)
@@ -123,19 +117,26 @@ namespace CDCloser
             if (disc_recorder == null) throw new InvalidOperationException("disc_recorder returned null");
             if (!files.All(file => File.Exists(file.path))) throw new InvalidOperationException("One of the provided files doesn't exist");
 
-            return run_sta_task(async () =>
+            string recorder_id = disc_recorder.ActiveDiscRecorder;
+
+            return run_sta_task(() =>
             {
                 ctoken.ThrowIfCancellationRequested();
-                disc_recorder.AcquireExclusiveAccess(false, "SharpDisk");
-                IFileSystemImage fsi = new MsftFileSystemImage
-                {
-                    VolumeName = volume_label,
-                };
 
-                if (!disc_format.MediaPhysicallyBlank && !disc_format.MediaHeuristicallyBlank) throw new InvalidOperationException("Media must be physically blank");
-                if (!disc_format.IsCurrentMediaSupported(disc_recorder)) throw new InvalidOperationException("Current media is not supported");
-                if (!disc_format.IsRecorderSupported(disc_recorder)) throw new InvalidOperationException("This recorder is not supported for data burning");
-                IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE mediaType = disc_format.CurrentPhysicalMediaType;
+                var local_recorder = new MsftDiscRecorder2();
+                local_recorder.InitializeDiscRecorder(recorder_id);
+
+                var local_format = new MsftDiscFormat2Data();
+                local_format.Recorder = local_recorder;
+                local_format.ClientName = "SharpDisk";
+
+                IFileSystemImage fsi = new MsftFileSystemImage { VolumeName = volume_label, };
+                ConnectionPointCookie local_cookie = null;
+
+                if (!local_format.MediaPhysicallyBlank && !local_format.MediaHeuristicallyBlank) throw new InvalidOperationException("Media must be physically blank");
+                if (!local_format.IsCurrentMediaSupported(local_recorder)) throw new InvalidOperationException("Current media is not supported");
+                if (!local_format.IsRecorderSupported(local_recorder)) throw new InvalidOperationException("This recorder is not supported for data burning");
+                IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE mediaType = local_format.CurrentPhysicalMediaType;
 
                 if (mediaType == IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE.IMAPI_MEDIA_TYPE_CDROM ||
                     mediaType == IMAPI2.IMAPI_MEDIA_PHYSICAL_TYPE.IMAPI_MEDIA_TYPE_CDR ||
@@ -144,7 +145,7 @@ namespace CDCloser
                     fsi.FileSystemsToCreate = FsiFileSystems.FsiFileSystemISO9660 | FsiFileSystems.FsiFileSystemJoliet;
                 }
                 else fsi.FileSystemsToCreate = FsiFileSystems.FsiFileSystemUDF;
-                fsi.FreeMediaBlocks = disc_format.FreeSectorsOnMedia;
+                fsi.FreeMediaBlocks = local_format.FreeSectorsOnMedia;
 
                 IFsiDirectoryItem root = fsi.Root;
                 foreach (var item in files)
@@ -155,15 +156,15 @@ namespace CDCloser
 
                 IFileSystemImageResult result = fsi.CreateResultImage();
                 IMAPI2.IStream image_stream = (IMAPI2.IStream)(object)result.ImageStream;
-                disc_format.ForceMediaToBeClosed = close_media;
+                local_format.ForceMediaToBeClosed = close_media;
                 //Set write speed here later
 
                 var sink = new DataFormatEventsSink(p => progress?.Report(p));
-                event_cookie = ConnectionPointCookie.Advise(disc_format, sink, typeof(DDiscFormat2DataEvents));
+                local_cookie = ConnectionPointCookie.Advise(local_format, sink, typeof(DDiscFormat2DataEvents));
 
                 try
                 {
-                    disc_format.Write(image_stream);
+                    local_format.Write(image_stream);
                     progress?.Report(new BurnProgress
                     {
                         percent = 100,
@@ -172,17 +173,16 @@ namespace CDCloser
                 }
                 finally
                 {
-                    event_cookie?.Unadvise();
-                    event_cookie = null;
+                    local_cookie?.Unadvise();
+                    local_cookie = null;
 
                     if(result != null && Marshal.IsComObject(result)) Marshal.ReleaseComObject(result);
                     if(result != null && Marshal.IsComObject(fsi)) Marshal.ReleaseComObject(fsi);
+                    if (Marshal.IsComObject(local_format)) Marshal.ReleaseComObject(local_format);
+                    if (Marshal.IsComObject(local_recorder)) Marshal.ReleaseComObject(local_recorder);
                     
-                    disc_recorder.ReleaseExclusiveAccess();
-
-
+                    //disc_recorder.ReleaseExclusiveAccess();
                 }
-                await Task.CompletedTask;
 
             }, ctoken);
 
@@ -220,9 +220,11 @@ namespace CDCloser
             disc_master = null;
         }
     }
-    
+
 
     //Everything under here is also pretty much a mystery. I've never done any sort of threading with an interop library like this before.
+    [ComVisible(true)]
+    [ClassInterface(ClassInterfaceType.None)]
     public class DataFormatEventsSink : DDiscFormat2DataEvents
     {
         private readonly Action<BurnProgress> report;
@@ -230,8 +232,10 @@ namespace CDCloser
         public DataFormatEventsSink(Action<BurnProgress> report) => this.report = report;
         public void Update(object sender, object progress)
         {
+            Debug.WriteLine("Update called");
             if (progress is IDiscFormat2DataEventArgs args)
             {
+                Debug.WriteLine($"Current Action: {args.CurrentAction}, Sector Count: {args.SectorCount}");
                 uint total = (uint)args.SectorCount;
                 uint written = (uint)args.LastWrittenLba + 1;
                 int percent = total == 0 ? 0 : (int)Math.Min(100, (written * 100.0 / total));
@@ -242,7 +246,12 @@ namespace CDCloser
                     last_written_sector = written,
                     remaining_sectors = total > written ? total - written : 0
                 };
+                Debug.WriteLine($"Reporting Progress: {percent}%");
                 report(burn_progress);
+            }
+            else
+            {
+                Debug.WriteLine($"Progress object type: {progress?.GetType().FullName ?? "null"}");
             }
         }
     }
